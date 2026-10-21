@@ -491,9 +491,11 @@ def main() -> int:
     try:
         wb.save(salida)
     except PermissionError:
-        # Pasa cuando se regenera el papel con el fichero abierto en Excel.
+        # Pasa cuando se regenera el papel con el fichero abierto en Excel, y tambien
+        # cuando el entorno no deja escribir en esa carpeta (ChatGPT, registro del 21/10/2026).
         print("ERROR: no se puede escribir " + str(salida))
-        print("       El fichero esta abierto en Excel. Cierralo y repite.")
+        print("       O esta abierto en Excel (cierralo y repite), o el entorno no tiene permiso")
+        print("       para escribir en esa carpeta (pide el permiso y repite).")
         return 2
 
     print("Escrito: " + str(salida))

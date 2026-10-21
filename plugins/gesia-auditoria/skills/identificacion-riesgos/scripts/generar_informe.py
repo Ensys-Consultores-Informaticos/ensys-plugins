@@ -538,8 +538,10 @@ def main() -> int:
     try:
         doc.save(salida)
     except PermissionError:
+        # o el entorno no deja escribir en esa carpeta (ChatGPT, registro del 21/10/2026)
         print("ERROR: no se puede escribir " + str(salida))
-        print("       El fichero está abierto en Word. Ciérralo y repite.")
+        print("       O está abierto en Word (ciérralo y repite), o el entorno no tiene permiso")
+        print("       para escribir en esa carpeta (pide el permiso y repite).")
         return 2
 
     print("Escrito: " + str(salida))

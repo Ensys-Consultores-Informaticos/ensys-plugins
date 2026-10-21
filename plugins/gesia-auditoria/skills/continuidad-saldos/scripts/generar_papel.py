@@ -183,8 +183,11 @@ def main() -> int:
         # Pasa siempre que se regenera el papel con el fichero abierto en Excel,
         # que es lo normal cuando el auditor esta revisandolo. Sin este mensaje
         # sale un traceback de zipfile que no dice que hay que cerrar el fichero.
+        # Pero no es la unica causa: en ChatGPT el entorno no deja escribir fuera de
+        # su carpeta sin permiso, y el mensaje culpaba a Excel (registro del 21/10/2026).
         print("ERROR: no se puede escribir " + str(salida))
-        print("       El fichero esta abierto en Excel. Cierralo y repite.")
+        print("       O esta abierto en Excel (cierralo y repite), o el entorno no tiene permiso")
+        print("       para escribir en esa carpeta (pide el permiso y repite).")
         return 2
 
     print("Escrito: " + str(salida))
