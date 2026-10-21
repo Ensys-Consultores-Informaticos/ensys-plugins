@@ -153,8 +153,16 @@ Al cargarse, el runtime indica el **directorio base del skill**. Las rutas
 
 ```bash
 SKILL="<directorio base indicado al cargar el skill>"
-TRABAJO="$(pwd)/trabajo" && mkdir -p "$TRABAJO"
+TRABAJO="$(mktemp -d "${TMPDIR:-/tmp}/cancelacion-XXXX")" && echo "$TRABAJO"
 ```
+
+**Un directorio de trabajo nuevo en cada ejecución**, con el nombre del skill: nunca el de
+otra ejecución ni el de otro skill, que pueden traer ficheros de otro expediente con el
+mismo nombre. **No hagas `cd` dentro**: todas las rutas van como `"$TRABAJO/<fichero>"`, y así
+se puede borrar al final desde fuera. **Anota la ruta que imprime**: si el entorno no conserva
+variables entre llamadas, vuelve a escribir `TRABAJO="<esa ruta>"` al principio de cada orden
+—y lo mismo `SKILL`, `EXTRACTO` y `PAPEL`—, sin crear otro. Esa ruta anotada es también la que
+se borra al final, escrita literal (paso 4).
 
 `reconocer.py` (pasada en seco antes de nada), `verificar_contrato.py`,
 `generar_papel.py` y `ejecutar_cancelacion.py`, que encadena los dos ultimos. Mas
@@ -167,12 +175,12 @@ TRABAJO="$(pwd)/trabajo" && mkdir -p "$TRABAJO"
 ### Paso 1 — Expediente y cuenta(s) a procesar
 
 ```
-configurar(perfil = "cancelacion-saldos")   # primero: lista blanca y nombres tokenizados
-contexto_expediente()
+configurar(perfil = "cancelacion-saldos")   # primero: lista blanca y terceros seudonimizados
+contexto_expediente()                       # siempre, aunque ya lo tengas de antes
 ```
 
 **Lo primero, antes de leer nada: `configurar(perfil = "cancelacion-saldos")`.** Con el perfil, el
-MCP retira del extracto las columnas que este skill no necesita y **tokeniza los nombres de
+MCP retira del extracto las columnas que este skill no necesita y **seudonimiza los nombres de
 terceros** en todo lo que devuelve: verás `PROV 40000012` o `CLI 43000007` donde iría la razón
 social. El nombre no sale del equipo del auditor —ni al contenedor ni a este chat—; el papel lo
 recupera al final con `rehidratar`. Trabaja y habla **por cuenta y por token**: «la apertura de
@@ -181,14 +189,25 @@ adivines** por el concepto o por los importes: él lo lee en el papel. Si `confi
 `nombres_terceros: en claro — forzado por el auditor`, es que lo ha apagado él; no lo
 vuelvas a encender tú.
 
-Si falta `gs3_file`, pide la ruta. Si el servidor API no responde, dile que
-lo arranque en *Herramientas > Gesia - Cuadro de mando > Arrancar servidor
-API*. Si el expediente no tiene diario importado, **para**: sin diario no
+El perfil marca también **el comienzo del procedimiento**: desde ahí el MCP lleva la cuenta de
+lo que facilita a la herramienta, que es lo que el papel dirá en su hoja «Uso de IA».
+
+**Y después de `configurar`, llama SIEMPRE a `contexto_expediente()`**, aunque ya lo tengas de
+antes en la conversación: lo que se leyó con otro perfil no cuenta como facilitado para este
+papel, y la hoja «Uso de IA» lo listaría mal.
+
+**Si `configurar` avisa de que otra conversación está trabajando con otro expediente o perfil**
+en el mismo servidor, **para**: díselo al auditor tal cual y no sigas hasta que confirme que esa
+otra conversación ha terminado. Las dos comparten el MCP y se pisan el expediente, el perfil y
+la cuenta de lo facilitado.
+
+Si falta `gs3_file`, pide la ruta. Si el servidor API no responde, llama a
+`arrancar_api`. Si el expediente no tiene diario importado, **para**: sin diario no
 hay apuntes que cancelar.
 
 **Pregunta qué cuenta o grupo de cuentas quiere procesar**: una cuenta
-concreta, un grupo (43 clientes, 40 proveedores...), varias cuentas sueltas, o **las N
-con más apuntes de un grupo**. No asumas "todo el diario" — con miles de cuentas el
+concreta, un grupo (43 clientes, 40 proveedores...), varias cuentas sueltas, **las N
+con más apuntes de un grupo** o **los N clientes o proveedores de mayor saldo**. No asumas "todo el diario" — con miles de cuentas el
 papel sería enorme y la mayoría no tiene nada que cancelar.
 
 Para el «top N por apuntes», **el filtro de saldo vivo va antes del ranking**, no después:
@@ -201,6 +220,32 @@ consultar_diario(sql = "SELECT TOP 5 CUENTA, Count(*) AS N FROM Diario
   GROUP BY CUENTA HAVING Abs(Sum(SALDO)) > 0.005
   ORDER BY Count(*) DESC, CUENTA")
 ```
+
+Para **«los N clientes (o proveedores) de mayor saldo»**, lo mismo ordenado por el saldo, con
+dos cosas de JET que muerden: **el alias no puede llamarse como un campo de la tabla** —`AS
+Saldo` choca con la columna `SALDO` y da «Referencia circular causada por el alias 'Saldo'»
+(registro del 21/10/2026)—, así que va `AS SaldoCuenta`; y **`HAVING` y `ORDER BY` van por la
+expresión, no por el alias**, igual que el `Count(*)` de arriba. La consulta:
+
+```
+consultar_diario(sql = "SELECT TOP 5 CUENTA, Sum(SALDO) AS SaldoCuenta FROM Diario
+  WHERE Left(CUENTA, 3) IN ('430','431','432','433','434','435','436')
+  GROUP BY CUENTA HAVING Sum(SALDO) > 0.005
+  ORDER BY Sum(SALDO) DESC, CUENTA")
+```
+
+**Qué es «cliente» y qué es «mayor saldo», si el auditor no dice otra cosa** (decidido por el
+auditor el 21/10/2026): las subcuentas **430 a 436**, por **saldo deudor** de mayor a menor —por
+eso el `HAVING` va con signo y sin `Abs()`: un cliente con saldo acreedor no es de los de «mayor
+saldo»—, y **fuera los anticipos, 438**. Para proveedores, el simétrico como criterio por
+defecto: **400 a 406** por **saldo acreedor** —`HAVING Sum(SALDO) < -0.005` y `ORDER BY
+Sum(SALDO), CUENTA`, del más negativo al menos—, fuera los anticipos, **407**. Dilo en una línea
+al proponer las cuentas, para que el auditor lo cambie si quiere otro.
+
+**Si entre las N sale alguna 4309** (facturas pendientes de formalizar), avísalo al proponerlas:
+puede traer la apertura en varios apuntes del 1 de enero, y entonces no se sabe cuál es y el
+emparejamiento no la intenta. En un expediente real una 4309 salió en `reconocer.py` como «NO
+IDENTIFICABLES (1): varios apuntes el 1 de enero».
 
 Con esas cuentas se escribe el `SELECT` del paso 2 con `CUENTA IN ('…','…')`, y el
 recuento que se le dice al auditor es el de esas cuentas.
@@ -377,17 +422,25 @@ conectado si no lo tienes claro.
 
 **Si la carpeta conectada ES el expediente** —lo habitual cuando el auditor conecta
 la carpeta del cliente—, no hay otra: `_tmp_cowork\` en la raíz del expediente, fuera
-de `AsistenteIA`, y **al terminar `limpiar_exportaciones()` borra el fichero y la
-carpeta si queda vacía**. Dile al auditor que ahí ha habido contabilidad hasta el
-borrado, por si el expediente se sincroniza a la nube.
+de `AsistenteIA`, y **al terminar `limpiar_exportaciones(procedimiento = "cancelacion-saldos")`
+borra el fichero y la carpeta si queda vacía**. Dile al auditor que ahí ha habido contabilidad
+hasta el borrado, por si el expediente se sincroniza a la nube.
 
-Luego se sube y se trabaja con la copia del sandbox, que aparece bajo
-`/mnt/user-data/uploads/` con la misma ruta relativa:
+Luego se sube con `device_stage_files` y se trabaja con una copia en `$TRABAJO`. Lo subido
+aparece bajo `/mnt/user-data/uploads/`, **colgado de una subcarpeta con el nombre de la carpeta
+conectada**, y se copia **por su nombre exacto**, nunca con un comodín —en `_tmp_cowork` puede
+haber lo exportado por otro procedimiento—:
 
 ```bash
-# device_stage_files con la ruta absoluta del extracto
-EXTRACTO="/mnt/user-data/uploads/_tmp_cowork/extracto.csv"
+# tras device_stage_files de <raíz conectada>/_tmp_cowork/extracto.csv
+cp "/mnt/user-data/uploads/<carpeta conectada>/_tmp_cowork/extracto.csv" "$TRABAJO/extracto.csv"
+EXTRACTO="$TRABAJO/extracto.csv"
 ```
+
+**Si `device_stage_files` falla por permisos** («can't be read without a grant…»), llama a
+`device_request_folder_access` con la raíz de la carpeta conectada y repite la subida **una
+vez**. Si vuelve a fallar, **para** y díselo al auditor con el mensaje tal cual: sin la subida
+los scripts no tienen nada que leer.
 
 **En la máquina del auditor (Claude Code) no hay nada de esto**: MCP y
 scripts comparten disco, así que el paso 2 exporta a la carpeta temporal
@@ -475,10 +528,25 @@ sumar, y el grupo se acepta solo si suma cero. Por eso preguntar no tiene riesgo
 Una sola orden: comprueba el contrato y, solo si se puede seguir, escribe el
 papel. Antes eran dos llamadas y no hacía falta volver entre una y otra.
 
+**Si el papel ya existe, pregunta antes de generarlo.** Mira si en
+`<expediente>\AsistenteIA\CancelacionSaldos\` ya hay un fichero con ese nombre<!-- solo-cowork:alt=. --> —en
+Cowork, listando la carpeta conectada con `device_list_dir`; en local, en el disco—.<!-- /solo-cowork -->
+Si lo hay, **pregunta al auditor** si lo sobrescribe o si guarda el nuevo con « (rehecho
+AAAA-MM-DD)» antes de la extensión, con la fecha de hoy. Ni lo sobrescribas sin preguntar ni
+inventes otro sufijo: al repetir un procedimiento el mismo día, una ejecución pisó el papel y otra
+improvisó el nombre (registro del 21/10/2026). El nombre elegido es el de todo lo que sigue
+—<!-- solo-cowork -->la bajada al expediente, <!-- /solo-cowork -->el sello y la recuperación de nombres—.<!-- solo-cowork --> En
+Cowork, `device_commit_files` va **sin `force`**; solo si el auditor eligió sobrescribir y el
+commit lo rechaza porque el fichero existe, repítelo con `force` y díselo.<!-- /solo-cowork -->
+
 ```bash
 PAPEL="Cancelacion Saldos <GRUPO> <CLIENTE> <EJERCICIO>.xlsx"
-python "$SKILL/scripts/ejecutar_cancelacion.py" --entrada "$EXTRACTO" --salida "$TRABAJO/$PAPEL"
+python "$SKILL/scripts/ejecutar_cancelacion.py" --entrada "$EXTRACTO" --salida "$TRABAJO/$PAPEL" \
+    --generado "<fecha de hoy, dd/mm/aaaa>"
 ```
+
+`--generado` es la fecha de hoy, que conoces por tu contexto. **La pones tú**: nada en este
+skill lee el reloj. Sin ella el papel no se escribe.
 
 Salida `2` → **para**: el contrato no se cumple —faltan columnas, hay fechas o
 importes que no se interpretan— y **no se ha escrito nada**.
@@ -498,8 +566,8 @@ al explicar el resultado.
 <!-- solo-cowork:entrega -->
 **En Cowork el script escribe en el sandbox, no en el expediente**, así que
 la ruta de destino no se cumple sola: hay que bajar el fichero. Se envía con
-`SendUserFile`, que devuelve un `file_uuid`, y con `device_commit_files` se
-escribe en el disco del auditor:
+`SendUserFile` **por su nombre exacto** —`"$TRABAJO/$PAPEL"`, nunca `"$TRABAJO"/*.xlsx`—,
+que devuelve un `file_uuid`, y con `device_commit_files` se escribe en el disco del auditor:
 
 ```
 device_commit_files → "<expediente>/AsistenteIA/CancelacionSaldos/<PAPEL>"
@@ -525,7 +593,15 @@ nuevos (este papel) / sin cancelar / pendiente, y si alguna cuenta no
 verifica o trae el punteo previo descuadrado. **Lee esa salida antes de
 entregar** — no hace falta abrir el Excel para saber si algo falló.
 
-**La primera hoja es «Criterios y hallazgos»**, y es la que hay que leer
+**El libro empieza por la hoja «Uso de IA»**: la evidencia de que el papel se hizo con una
+herramienta de inteligencia artificial, de qué se le facilitó, de lo que comprobó ella misma
+—que cada grupo suma cero, la columna VERIFICACION, que el punteo previo se ha respetado— y de
+cómo debe verificarse. Los apartados de la herramienta quedan con huecos que se rellenan al
+archivar (paso 4); los de verificación, verificado por, efecto en la conclusión y revisión
+**son del equipo y salen en blanco**. No escribas nada en ellos ni propongas texto para ellos.
+La hoja Resumen lleva en la fila 2 la marca «Uso de IA: pendiente de verificación».
+
+**Después va «Criterios y hallazgos»**, y es la que hay que leer
 antes de nada: dice bajo qué reglas se han formado los grupos, qué fecha se
 usa para cada cosa, y **qué no prueba este papel** —un grupo es una
 cancelación aritmética, no la evidencia documental de que ese pago liquide
@@ -590,34 +666,62 @@ cuéntalo como lo que es: un posible error de punteo en la contabilidad del
 cliente, que el auditor tendrá que mirar.
 
 
-**Los nombres.** El fichero se ha escrito con tokens. Cuando ya esté en el disco del auditor
-—en Cowork, después de bajarlo al expediente; en local, directamente—, llama a
-`rehidratar(ruta = "<expediente>/AsistenteIA/…/<fichero>", leyenda = true)`: sustituye cada
-token por el nombre real, en local, y devuelve recuentos —ni un nombre vuelve aquí—. Con
-`leyenda = true` añade la tabla token → nombre (hoja «Tokens» en el Excel), para que lo que
-has dicho en el chat con tokens se pueda leer en el papel. **Cuéntale al auditor los dos
-números que devuelve** (sustituciones y tokens distintos) y, si hay `tokens_sin_nombre`,
-dilos tal cual: son cuentas que el diccionario no conoce, no las completes tú.
+**Archivar.** Con el papel **ya en el disco del auditor**, en
+`<expediente>\AsistenteIA\CancelacionSaldos\`<!-- solo-cowork:alt=, --> —en Cowork, después de
+`device_commit_files`; en local, directamente—,<!-- /solo-cowork --> dos llamadas sobre esa ruta
+de Windows, en este orden o en el contrario:
 
-Con este párrafo, y sin llamar «rehidratar» a nada delante del auditor —para él es
-**desanonimizar**—:
+1. **`sellar_uso_ia(ruta = "<expediente>/AsistenteIA/CancelacionSaldos/<fichero>", modelo =
+   "<el modelo con el que trabajas>", procedimiento = "cancelacion-saldos")`.** Rellena en la hoja «Uso de IA» lo que solo sabe la
+   aplicación: herramienta y versiones, quién lo ejecutó, dónde corrieron los scripts y **qué
+   información se facilitó y cómo**, según lo que el MCP ha servido desde el paso 1. En `modelo`
+   pon el nombre y la versión que te da tu propio contexto; si no lo sabes, déjalo vacío. **Sin
+   esta llamada el papel queda con huecos que dicen «pendiente»**: no se da por entregado.
+2. **`rehidratar(ruta = …, leyenda = true)`.** Sustituye cada token por el nombre real, en
+   local, y devuelve recuentos —ni un nombre vuelve aquí—. Con `leyenda = true` añade la hoja
+   «Tokens» con la equivalencia token → nombre, para que lo que has dicho en el chat con tokens
+   se pueda leer en el papel. **Cuéntale al auditor los dos números que devuelve**
+   (sustituciones y tokens distintos) y, si hay `tokens_sin_nombre`, dilos tal cual: son
+   cuentas que el diccionario no conoce, no las completes tú.
 
-> *Papel generado y archivado en el expediente: `AsistenteIA\…\<fichero>` (también lo tienes
-> en el chat, aunque esa copia está anonimizada). Nombres ya desanonimizados: N sustituciones,
-> M terceros distintos, ninguno sin nombre, y hoja «Tokens» con la leyenda. El extracto
+Con este párrafo, y sin llamar «rehidratar» ni «sellar» a nada delante del auditor:
+
+> *Papel generado y archivado en el expediente: `AsistenteIA\…\<fichero>`. Nombres de terceros
+> recuperados en tu equipo: N sustituciones, M terceros distintos, ninguno sin nombre, y hoja
+> «Tokens» con la leyenda. La hoja «Uso de IA» deja constancia de la herramienta y de lo que se
+> le facilitó; la verificación, quién la hace, su efecto en la conclusión y la revisión están en
+> blanco para el equipo, y mientras lo estén el papel no es evidencia de auditoría. El extracto
 > temporal está borrado.*
 
 Si hubo tokens sin nombre, en vez de «ninguno sin nombre» van listados. <!-- solo-cowork:papel-unico -->La copia del chat
-**siempre** está anonimizada —viajó por el contenedor—: dilo, para que no la confunda con el
-papel bueno.<!-- /solo-cowork -->
+**siempre** está seudonimizada y sin sellar —viajó por el contenedor—: dilo, para que no la
+confunda con el papel bueno.<!-- /solo-cowork -->
 
-**Los temporales.** Llama a `limpiar_exportaciones()`: borra el extracto,
-que lleva contabilidad del cliente. Funciona igual en local y en Cowork —lo
-borra el MCP, que corre en la máquina del usuario— y no hay que decirle qué
-fichero: borra lo que él escribió. Si algo no se puede borrar (típicamente
-un `.csv` abierto en Excel), lo dice con su ruta: trasládala al usuario.
-Borra tú el directorio de trabajo aparte, si creaste uno. **El diccionario de nombres no se
-borra**: vive con el encargo, cifrado, y es lo que permite rehidratar un papel de hace días.
+En `sellar_uso_ia`, `procedimiento` es el mismo nombre del perfil de `configurar`: con él el
+sello lista lo que se facilitó **para este papel**, no lo de otra conversación que comparta el
+servidor.
+
+**Los temporales.** Llama a `limpiar_exportaciones(procedimiento = "cancelacion-saldos")`:
+borra el extracto, que lleva contabilidad del cliente. Funciona igual en local y en Cowork —lo
+borra el MCP, que corre en la máquina del usuario— y no hay que decirle qué fichero: borra lo
+que él escribió **para este procedimiento**. Lo exportado por otros lo deja y lo resume en unas
+líneas: no lo borres tú, dilo tal cual. Si algo no se puede borrar (típicamente un `.csv`
+abierto en Excel), lo dice con su ruta: trasládala al usuario.
+
+El directorio de trabajo va aparte, y se borra **desde fuera**, sin estar dentro de él:
+
+```bash
+rm -rf "<!-- solo-cowork:alt=<TRABAJO> --><la ruta que anotaste al crearlo, literal><!-- /solo-cowork -->"
+```
+
+<!-- solo-cowork -->**Con la ruta escrita tal cual, nunca con una variable ni con `$(cat …)`**: si el
+entorno no conserva variables, `"$TRABAJO"` llega vacío, y el control de seguridad del entorno
+bloquea un `rm -rf` sobre una expansión como `"$(cat …)"` (registro del 21/10/2026).
+
+<!-- /solo-cowork -->Si no se deja borrar, **di la ruta exacta** de `$TRABAJO` y qué contiene —el extracto del
+cliente y, si se escribió ahí, la copia del papel— para que el usuario lo quite. **El
+diccionario de nombres no se borra**: vive con el encargo, cifrado, y es lo que permite
+rehidratar un papel de hace días.
 
 ---
 
@@ -636,6 +740,8 @@ borra**: vive con el encargo, cifrado, y es lo que permite rehidratar un papel d
   miles de apuntes sueltos.
 - **No decide qué cuenta o grupo de cuentas procesar.** Eso lo dice el
   auditor en el paso 1.
+- **No verifica su propio resultado por el equipo.** Propone qué contrastar; la verificación,
+  quién la hace y su efecto en la conclusión los escribe el equipo en la hoja «Uso de IA».
 - **No explica por qué un apunte queda pendiente**, solo lo localiza. Que
   una factura siga en ÍNDICE 0 puede ser porque de verdad está impagada, o
   porque el pago viene en otro ejercicio, u otra cuenta, o con un importe
@@ -657,6 +763,8 @@ borra**: vive con el encargo, cifrado, y es lo que permite rehidratar un papel d
 | Cuenta con apuntes pendientes de un solo signo | sigue: todo queda en ÍNDICE 0, y se avisa de que no había nada que cancelar |
 | Un grupo del skill no suma exactamente 0 (bug, no debería pasar) | la hoja de esa cuenta marca VERIFICACION = REVISAR |
 | Fichero de salida abierto en Excel | **para** al guardar, y dice que hay que cerrarlo |
+| `sellar_uso_ia` dice que no hay huecos | el papel ya estaba sellado o no es el que escribió el script: no lo repitas, dilo |
+| `sellar_uso_ia` dice que no tiene constancia de lo facilitado | o no se sirvió nada por el plugin, o el MCP se reinició a mitad: el papel lo dice y remite a `RegistroEmision.jsonl`; cuéntaselo al auditor tal cual |
 
 ## Comprobar que el skill funciona
 

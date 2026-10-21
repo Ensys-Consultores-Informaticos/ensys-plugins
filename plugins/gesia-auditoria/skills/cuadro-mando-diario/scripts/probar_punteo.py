@@ -18,8 +18,12 @@ from pathlib import Path
 
 import pandas as pd
 
-import lib_diario as LD
-import analizar_punteo as AP
+# La carpeta del script, antes de los imports locales: con `python -I` (modo aislado) Python no
+# la pone en sys.path y los modulos hermanos no se encuentran.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import lib_diario as LD  # noqa: E402
+import analizar_punteo as AP  # noqa: E402
 
 CIERRE = pd.Timestamp("2025-12-31")
 UMBRAL = 80.0

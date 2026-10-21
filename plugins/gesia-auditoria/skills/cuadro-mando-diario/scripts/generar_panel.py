@@ -27,9 +27,13 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-
-import hechos as HECHOS
 from pathlib import Path
+
+# La carpeta del script, antes de los imports locales: con `python -I` (modo aislado) Python no
+# la pone en sys.path y los modulos hermanos no se encuentran.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import hechos as HECHOS  # noqa: E402
 
 RAIZ = Path(__file__).resolve().parent.parent
 PLANTILLA = RAIZ / "assets" / "panel_estilo.html"

@@ -9,7 +9,7 @@
     {
       "name": "gesia-auditoria",
       "source": "./plugins/gesia-auditoria",
-      "description": "Procedimientos de auditoría sobre el expediente de Gesia: estados financieros, memoria, saldos, diario, riesgos, investigación de la entidad y pruebas de muestreo de ForSampling. Dejan papeles en el expediente; concluye el auditor. Los terceros viajan anonimizados y las facturas se tachan en tu equipo antes de subirlas. Si solo tienes ForSampling, instala el de ForSampling. Requiere Windows.",
+      "description": "Procedimientos de auditoría sobre el expediente de Gesia: estados financieros, memoria, saldos, diario, riesgos, investigación de la entidad y pruebas de muestreo de ForSampling. Dejan papeles en el expediente; concluye el auditor. Los terceros viajan seudonimizados y las facturas se tachan en tu equipo antes de subirlas. Si solo tienes ForSampling, instala el de ForSampling. Requiere Windows.",
       "author": {
         "name": "Ensys Consultores Informáticos, S.L."
       },
@@ -18,7 +18,7 @@
     {
       "name": "forsampling-auditoria",
       "source": "./plugins/forsampling-auditoria",
-      "description": "Pruebas de muestreo de ForSampling para quien no tiene Gesia: cumplimiento y MUM contra las facturas escaneadas, y el papel de la NIA-ES 530. Trabaja sobre el cliente de muestreo (.cli); concluye el auditor. Los terceros viajan anonimizados y las facturas se tachan en tu equipo antes de subirlas. Si tienes Gesia, no instales este: el de Gesia ya lo incluye. Requiere Windows y ForSampling.",
+      "description": "Pruebas de muestreo de ForSampling para quien no tiene Gesia: cumplimiento y MUM contra las facturas escaneadas. Trabaja sobre el cliente de muestreo (.cli); concluye el auditor. Los terceros viajan seudonimizados y las facturas se tachan en tu equipo antes de subirlas. Si tienes Gesia, no instales este: el de Gesia ya lo incluye. Requiere Windows y ForSampling.",
       "author": {
         "name": "Ensys Consultores Informáticos, S.L."
       },

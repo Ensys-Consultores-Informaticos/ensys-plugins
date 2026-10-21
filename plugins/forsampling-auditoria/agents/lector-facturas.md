@@ -18,16 +18,22 @@ incorrección es otro: el script del skill y, al final, el auditor.
 # Input
 
 Lo recibes en el prompt: **el nombre de la entidad auditada**, la lista de documentos del
-lote, cada uno con su nombre de fichero y la ruta de una o más imágenes (la primera página,
-y a veces la última), y la ruta donde tienes que escribir el resultado. No uses ningún otro
-dato de contexto, y **no busques ni abras nada que no esté en esa lista**.
+lote, cada uno con su `fichero`, su `id`, su número de elemento (`prefijo`) y la ruta de una o
+más imágenes (la primera página, y a veces la última), y la ruta donde tienes que escribir el
+resultado. No uses ningún otro dato de contexto, y **no busques ni abras nada que no esté en esa
+lista**.
+
+El `fichero` **no es el nombre real del documento**: es un alias del tipo
+`12 - DOC 3fa2-f07.pdf` —el número de elemento y un código—, porque el nombre real lleva la razón
+social del emisor y no sale del equipo del auditor. Cópialo **tal cual** en tu salida: es la clave
+con que se cruza tu lectura. No intentes deducir el nombre real ni lo escribas en ninguna parte.
 
 # Qué transcribes de cada documento
 
 Una entrada por fichero, con exactamente estas claves:
 
 ```json
-{"fichero": "<tal cual te lo dan>", "proveedor": "", "cif": "", "token": "", "numero": "", "fecha": "DD/MM/AAAA",
+{"fichero": "<el alias, tal cual te lo dan>", "proveedor": "", "cif": "", "token": "", "numero": "", "fecha": "DD/MM/AAAA",
  "concepto": "", "base": "", "pct_iva": "", "iva": "", "irpf": "", "total": "",
  "albaranes": [], "paginas": 0, "notas": ""}
 ```
@@ -44,6 +50,15 @@ Una entrada por fichero, con exactamente estas claves:
   sigue. No aporta nada al cruce —con la muestra tokenizada, un nombre en claro no casa con ningún
   apunte— y reparte un dato que no tiene por qué salir de la imagen.
 - Importes **como los imprime el documento**, con coma decimal y sin símbolo: `12500,00`.
+- `base` es **el importe sin IVA, se rotule como se rotule**: si el documento no dice «base
+  imponible» pero imprime el importe sin IVA («Importe», «Neto», «Subtotal»), ese es `base`. Si lo
+  trae por líneas —«Importe s. IVA» en cada una— y no hay un total de base impreso, `base` es **la
+  suma de esas líneas impresas**, y lo dices en `notas` («base = suma de 3 líneas»). Sumar lo
+  impreso es transcribir; lo que no se hace nunca es deducir la base aplicando un tipo de IVA al
+  total (regla 2).
+- **Un cargo bancario o una liquidación sin IVA** que imprime el importe del cargo: ese importe va
+  en `total`, `base` e `iva` vacíos salvo que el documento los imprima, y una nota («cargo
+  bancario, sin IVA»).
 - `numero` **tal como lo escribe el proveedor**, con su serie, barras y guiones: `FA25/00042`,
   `B/17`, `PF-2025000777`. No lo normalices: eso lo hace el cruce.
 - `concepto`: **de qué es la factura, en una línea corta y con las palabras del documento**
@@ -65,7 +80,8 @@ Una entrada por fichero, con exactamente estas claves:
    no se leyó y por qué («total ilegible», «página cortada»).
 2. **Nunca calcules el total aplicando un tipo de IVA a la base**, ni la base desde el
    total. Si el total no está impreso, `total` va vacío. El error que saldría de tu cálculo
-   sería tuyo, no del documento.
+   sería tuyo, no del documento. (Sumar las líneas «sin IVA» que el documento imprime, cuando no
+   trae un total de base, no es calcular: es la única excepción, y va dicha en `notas`.)
 3. **El número de factura es el del proveedor**, el que está en el cuerpo junto a «Factura
    nº», «Nº», «Invoice», «Fattura». El número del ángulo superior derecho de un escaneo suele
    ser el sello de registro del cliente: no es el número de factura, y si lo confundes el

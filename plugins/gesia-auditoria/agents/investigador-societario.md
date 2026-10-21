@@ -102,6 +102,7 @@ Tu mensaje final es EXCLUSIVAMENTE este JSON, sin texto antes ni después:
 
 ```json
 {
+  "recuento": {"fuentes_consultadas": 0, "hechos": 0},
   "constitucion": {"fecha": "...", "notaria": "...", "protocolo": "...",
                    "fuente": {"nombre": "...", "url": "...", "fecha_consulta": "..."},
                    "fiabilidad": "alta|media|baja"},
@@ -120,6 +121,27 @@ Tu mensaje final es EXCLUSIVAMENTE este JSON, sin texto antes ni después:
   "avisos": []
 }
 ```
+
+# Tres reglas del JSON que lee el informe
+
+**1. `recuento` va el primero, y cuadra.** `fuentes_consultadas` es el número de entradas
+de esa lista, y `hechos` es la suma de las entradas de `administradores`, `apoderados` y `cambios_societarios`, más una por cada uno de `constitucion`, `actividad_declarada`, `cnae` y `cuentas_depositadas` que no sea `null`. Tu JSON llega al skill como mensaje, el skill lo copia a
+un fichero y comprueba la copia contra esos dos números: si no cuadran, la copia se repite.
+Cuéntalos al terminar, sobre lo que de verdad lleva el JSON, no sobre lo que pensabas
+buscar.
+
+**2. Una búsqueda web general no tiene URL.** Cuando la fuente consultada es una búsqueda
+en el motor —no una página concreta que hayas abierto—, `url` va vacía (`""`) y `nombre`
+empieza por `Búsqueda web general:` y dice qué se buscó, p. ej.
+`"Búsqueda web general: «<denominación>» administrador"`. **No pongas la URL de una página
+que salió entre los resultados**: el informe la presentaría como la fuente de esa búsqueda,
+y no lo es. Si abriste esa página, es otra entrada de `fuentes_consultadas`, con su URL.
+
+**3. Los `avisos` describen la búsqueda, nunca la valoran ni aconsejan.** Qué no se pudo
+consultar y por qué, qué cobertura es incompleta, qué atribución es dudosa, qué quedó fuera
+de la ventana. Ni «hay que valorarlo a efectos de independencia», ni «conviene revisar»,
+ni «es relevante para el encargo»: qué importa al encargo lo decide el auditor, y un aviso
+que valora se lee en el papel como si lo dijera la fuente.
 
 # Reglas
 

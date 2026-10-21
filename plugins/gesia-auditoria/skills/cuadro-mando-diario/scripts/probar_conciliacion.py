@@ -18,8 +18,12 @@ import json
 import sys
 from pathlib import Path
 
-import lib_diario as LD
-import conciliar_gesia as CG
+# La carpeta del script, antes de los imports locales: con `python -I` (modo aislado) Python no
+# la pone en sys.path y los modulos hermanos no se encuentran.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import lib_diario as LD  # noqa: E402
+import conciliar_gesia as CG  # noqa: E402
 
 IR_T = 200_000.0
 UMBRAL = IR_T * CG.TRIVIAL_PCT_IR_T / 100.0     # 10.000 EUR

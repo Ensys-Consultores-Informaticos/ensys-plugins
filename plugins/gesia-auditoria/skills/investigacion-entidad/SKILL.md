@@ -5,7 +5,7 @@ description: >
   expediente de Gesia: información societaria (BORME), contratos públicos
   (PLACE), subvenciones (BDNS), jurisprudencia (CENDOJ), sanciones y prensa.
   Lanza tres agentes en paralelo y deja el papel en Word con cada hecho citado
-  a su fuente, y la evidencia en JSON.
+  a su fuente y las fuentes consultadas con su fecha.
   Usa este skill cuando el usuario pida investigar al cliente, buscar
   información pública o externa de la entidad, una due diligence, el
   conocimiento de la entidad y su entorno por fuentes externas, o diga cosas
@@ -29,9 +29,9 @@ paralelo (`agents/` del plugin), cada uno con su contrato JSON. El análisis y l
 redacción NO se delegan: son tuyos, en el contexto principal, donde el usuario
 puede corregirlos.
 
-El informe y su evidencia van a `<expediente>\AsistenteIA\InvestigacionEntidad\`
-y **nunca se publican** en ninguna URL, ni como Artifact: forman parte del
-archivo de un encargo.
+El informe va a `<expediente>\AsistenteIA\InvestigacionEntidad\` —solo el Word— y
+**nunca se publica** en ninguna URL, ni como Artifact: forma parte del archivo de un
+encargo.
 
 ---
 
@@ -56,9 +56,14 @@ elementos a contrastar, con su incertidumbre, nunca como conclusiones. Concluir
 es del auditor, que es quien firma. Y sobre las personas (administradores,
 apoderados): cargo y fechas publicados, ni una valoración.
 
-**5. La evidencia JSON se archiva junto al informe.** Las fuentes web cambian y
-la búsqueda de hoy no es reproducible mañana: lo que hace defendible el papel es
-conservar lo que los agentes devolvieron, tal cual, con su fecha de consulta.
+**5. La evidencia es el propio papel.** Las fuentes web cambian y la búsqueda de
+hoy no es reproducible mañana: lo que hace defendible el informe es que **cada hecho
+lleva su fuente** y que **la sección 8 recoge cada fuente consultada con su URL y su
+fecha de consulta**, junto con los avisos de los agentes sobre su búsqueda. Los JSON
+de los agentes son la entrada de `generar_informe.py`, que construye desde ellos esa
+sección: viven en el directorio de trabajo y se borran con él. **No se archivan**: en
+Cowork los agentes no escriben ficheros y su JSON llega como mensaje, así que guardarlo
+era retranscribirlo a mano, y una copia retranscrita no acredita más que el papel.
 
 ---
 
@@ -69,9 +74,25 @@ conservar lo que los agentes devolvieron, tal cual, con su fecha de consulta.
 Con expediente de Gesia (el caso normal):
 
 ```
-configurar()
+configurar(perfil = "investigacion-entidad")
 contexto_expediente()
 ```
+
+**El perfil va lo primero**: marca el comienzo del procedimiento, y desde ahí el MCP lleva
+la cuenta de lo que se facilita a la herramienta, que es lo que el informe dirá en su apartado
+de uso de IA. Este perfil no seudonimiza nada: la búsqueda necesita el nombre de la entidad
+tal cual, y lo que se lee del expediente —razón social, cierre, NIF— no lleva terceros.
+
+**`contexto_expediente()` va siempre, después del perfil, aunque ya lo tengas en la
+conversación.** Lo que se leyó antes con otro perfil cuenta para aquel procedimiento, no para
+este: si no lo vuelves a pedir, el apartado de uso de IA no lo lista como facilitado y el
+informe dice menos de lo que se usó.
+
+**Si `configurar` —o cualquier otra llamada del MCP— avisa de que otra conversación está
+trabajando con otro expediente o con otro perfil en el mismo servidor**, díselo al auditor tal
+cual y **no sigas hasta que confirme**. Las conversaciones abiertas a la vez comparten el MCP:
+cada `configurar` cambia el expediente y el perfil de todas, y lo que una lee o sella puede
+acabar en el papel de la otra sin que nada lo avise.
 
 De ahí salen la razón social (`RazonSocialCliente`) y la fecha de cierre. **No le
 pidas el nombre al usuario si el expediente lo trae.** Solo si no hay expediente, o
@@ -115,7 +136,7 @@ entidad no es mercantil, no la busques en el BORME como si lo fuera.
 
 **Y pide confirmación SIEMPRE, aunque haya una sola candidata.** Enséñale al usuario
 la tabla de candidatas válidas —denominación, CIF, provincia, fuente— y pregúntale
-cuál es su cliente. Es la única pregunta de la investigación, y no se salta: un CIF
+cuál es su cliente. Es la pregunta central de la investigación, y no se salta: un CIF
 mal elegido produce un informe entero sobre otra entidad, que es el peor resultado
 posible.
 
@@ -137,6 +158,10 @@ búsqueda es la que le digas, y que puede tardar varios minutos.
 **La ventana temporal por defecto son los 5 años anteriores al cierre auditado,
 hasta hoy.** Es la misma profundidad plurianual que maneja el expediente. Si el
 usuario quiere otra, se usa la suya y el informe la declara.
+
+Antes de lanzar nada, busca también **la referencia del papel** en `Referencias` (paso 7)
+y, si no sale una y solo una, pregúntala ahora, enseñando las candidatas: así no se le
+interrumpe otra vez al final.
 
 ### Paso 4 — Lanzar los tres agentes en paralelo
 
@@ -164,23 +189,48 @@ Fecha de consulta a registrar: <hoy>
 ```
 
 Cada agente devuelve **solo un JSON** (su contrato está en su propio fichero de
-`agents/`). Si uno devuelve otra cosa o falla, **un reintento y se sigue**: su
+`agents/`), que empieza por su `recuento`: cuántas fuentes consultadas y cuántos
+hechos lleva. Si uno devuelve otra cosa o falla, **un reintento y se sigue**: su
 sección del informe queda en ○ con la limitación explícita. No se bloquea la
 investigación entera por una pata.
 
-### Paso 5 — Archivar la evidencia
+### Paso 5 — Copiar los JSON al directorio de trabajo y comprobarlos
 
-Guarda los tres JSON **tal cual llegaron**, sin retocar, en:
+Un directorio de trabajo **nuevo en cada ejecución**, en la carpeta temporal del sistema y
+**nunca en `AsistenteIA`**:
 
-```
-<expediente>\AsistenteIA\InvestigacionEntidad\evidencia\
-    <AAAA-MM-DD> societario.json
-    <AAAA-MM-DD> sector-publico.json
-    <AAAA-MM-DD> riesgos-legales.json
+```bash
+TRABAJO="$(mktemp -d "${TMPDIR:-/tmp}/investigacion-XXXX")" && echo "$TRABAJO"
 ```
 
-(La fecha es la de consulta.) Crea el árbol de carpetas antes de escribir. Esto
-va **antes** del análisis: si algo se tuerce después, la evidencia ya está.
+**Anota la ruta que imprime**; si el entorno no conserva variables entre llamadas, vuelve a
+escribir `SKILL="…"` y `TRABAJO="<esa ruta>"` al principio de cada orden, sin crear otro
+directorio. No la guardes en un fichero para leerla luego con `$(cat …)`: al final se borra
+con la ruta escrita tal cual (paso 8). **No hagas `cd` a él**; trabaja con rutas completas:
+al final se borra desde fuera, y el entorno no deja borrar el directorio en el que estás.
+
+Copia el JSON de cada agente, **entero y tal cual llegó en su mensaje**, sin retocar ni
+resumir, a `$TRABAJO/societario.json`, `$TRABAJO/sector-publico.json` y
+`$TRABAJO/riesgos-legales.json` —con la herramienta de escribir ficheros si el entorno la
+tiene, o con un heredoc entre comillas simples, que no toca el texto:
+`cat > "$TRABAJO/societario.json" <<'FIN_JSON'` … `FIN_JSON`—. Son la entrada del
+informe, **no se archivan** (regla 5): no van a `AsistenteIA`.
+
+Y **comprueba las copias antes de seguir**, que es barato y caza lo que se pierde al
+copiar a mano:
+
+```bash
+python "$SKILL/scripts/generar_informe.py" --comprobar \
+    --evidencia-societario "$TRABAJO/societario.json" \
+    --evidencia-sector-publico "$TRABAJO/sector-publico.json" \
+    --evidencia-riesgos "$TRABAJO/riesgos-legales.json"
+```
+
+Carga cada JSON y cuenta sus fuentes y sus hechos contra el `recuento` que declaró el
+agente. Salida `2` → una copia no carga o no cuadra: **vuelve a copiar ese JSON del mensaje
+del agente**, entero, y repite la comprobación. Si un agente no declaró recuento, lo dice y
+no para: compáralo tú con su mensaje, y el informe hará constar que esa respuesta no se
+pudo cotejar. Si un agente se degradó, omite su `--evidencia-*`.
 
 ### Paso 6 — El análisis (este es tuyo)
 
@@ -211,17 +261,54 @@ expediente** (cliente, «AUDITORIA A <cierre>», título, fuente, bloque
 identificación de riesgos. La genera `generar_informe.py`; tú escribes el
 contenido en un JSON y el script maqueta.
 
-**La referencia se le pregunta al usuario**; si no la tiene, se pasa vacía
-(`--ref ""`) y la celda queda en blanco — nunca se inventa un código que no
-existe en el índice de Gesia.
+**La referencia del papel (`--ref`) sale de la tabla `Referencias` de ESTE expediente,
+y de ningún otro sitio.** Ni de memoria, ni de un ejemplo, ni de otro expediente: no se
+elige ni se **propone** un código que no hayas visto en una fila de estas consultas.
+`CodigoReferencia` no es estable entre encargos —el mismo código apunta a papeles
+distintos en expedientes distintos—: el 21/10/2026, en un expediente real, un código
+propuesto de memoria era allí el de la normativa aplicable, el usuario lo aceptó y el papel
+quedó archivado bajo la referencia de otro.
 
-Primero el contenido, en un temporal (**nunca en `AsistenteIA`**):
+1. **Búscala por el texto** del papel, que es el conocimiento de la entidad y su entorno:
 
-```bash
-TMPI="$TEMP/gesia-investigacion" && mkdir -p "$TMPI"
-```
+   ```sql
+   SELECT CodigoReferencia, Referencia FROM Referencias
+   WHERE Referencia LIKE '%conocimiento%entidad%' OR Referencia LIKE '%entidad y su entorno%'
+   ```
 
-Escribe `$TMPI/informe.json`:
+   **Una fila** → úsala, y dile al usuario cuál has cogido, con su código y su nombre.
+   **Ninguna, o más de una** → no elijas: punto 2.
+
+2. **Una segunda búsqueda más amplia, y se pregunta:**
+
+   ```sql
+   SELECT TOP 30 CodigoReferencia, Referencia FROM Referencias
+   WHERE Referencia LIKE '%conocimiento%' OR Referencia LIKE '%entorno%'
+      OR Referencia LIKE '%planificaci%n%'
+   ORDER BY CodigoReferencia
+   ```
+
+   En JET el comodín es `%`; con `*` sale vacía sin dar error. **Enséñale las candidatas,
+   cada una con su código y su nombre tal como vienen, y pregúntale cuál es.** Aunque salga
+   una sola, se pregunta; si no sale ninguna, díselo así y pregúntale igual.
+
+3. **Si el usuario da un código, compruébalo antes de usarlo** —también si lo dice de
+   entrada—:
+
+   ```sql
+   SELECT CodigoReferencia, Referencia FROM Referencias
+   WHERE CodigoReferencia = '<el código que ha dado>'
+   ```
+
+   Enséñale el nombre que tiene en este expediente y espera a que lo confirme. Sin fila,
+   ese código no existe aquí: díselo y no lo uses.
+
+Si no tiene referencia para este papel, se pasa vacía (`--ref ""`) y la celda queda en
+blanco: mejor un hueco que el código de otro papel. Para no interrumpir dos veces, haz
+esta búsqueda **antes de lanzar los agentes** (paso 3) y, si hay que preguntar, pregúntalo
+entonces.
+
+Escribe `$TRABAJO/informe.json`:
 
 ```json
 {
@@ -253,16 +340,28 @@ los agentes confirmen. En `limitaciones_especificas` va solo lo propio de esta
 entidad. Un id fuera del catálogo aborta.
 
 **La sección 8 (fuentes consultadas) no la escribes tú**: el script la
-construye desde los `fuentes_consultadas` de la evidencia archivada, con las
-que aportaron datos primero. Así el informe no puede citar una fuente que la
-evidencia no respalde.
+construye desde los `fuentes_consultadas` de los JSON de los agentes, con las
+que aportaron datos primero, y añade debajo sus `avisos` tal cual. Así el informe
+no puede citar una fuente que los agentes no registraran. Una búsqueda web general,
+que no es una página, sale sin URL.
+
+**Si el informe ya existe, pregunta antes de generarlo.** Mira si en
+`<expediente>\AsistenteIA\InvestigacionEntidad\` ya hay un fichero con ese nombre<!-- solo-cowork:alt=. --> —en
+Cowork, listando la carpeta conectada con `device_list_dir`; en local, en el disco—.<!-- /solo-cowork -->
+Si lo hay, **pregunta al auditor** si lo sobrescribe o si guarda el nuevo con « (rehecho
+AAAA-MM-DD)» antes de la extensión, con la fecha de hoy. Ni lo sobrescribas sin preguntar ni
+inventes otro sufijo: al repetir un procedimiento el mismo día, una ejecución pisó el papel y otra
+improvisó el nombre (registro del 21/10/2026). El nombre elegido es el de todo lo que sigue
+—<!-- solo-cowork -->la bajada al expediente y <!-- /solo-cowork -->el sello—.<!-- solo-cowork --> En
+Cowork, `device_commit_files` va **sin `force`**; solo si el auditor eligió sobrescribir y el
+commit lo rechaza porque el fichero existe, repítelo con `force` y díselo.<!-- /solo-cowork -->
 
 ```bash
 python "$SKILL/scripts/generar_informe.py" \
-    --contenido "$TMPI/informe.json" \
-    --evidencia-societario "<...>/evidencia/<fecha> societario.json" \
-    --evidencia-sector-publico "<...>/evidencia/<fecha> sector-publico.json" \
-    --evidencia-riesgos "<...>/evidencia/<fecha> riesgos-legales.json" \
+    --contenido "$TRABAJO/informe.json" \
+    --evidencia-societario "$TRABAJO/societario.json" \
+    --evidencia-sector-publico "$TRABAJO/sector-publico.json" \
+    --evidencia-riesgos "$TRABAJO/riesgos-legales.json" \
     --cliente "<razón social>" --cif "<CIF>" --cif-origen "<origen del paso 2>" \
     --registro "<registro del paso 2>" \
     --cierre "<dd/mm/aa>" \
@@ -272,19 +371,81 @@ python "$SKILL/scripts/generar_informe.py" \
 
 (AAAA = ejercicio auditado.) Si un agente se degradó, omite su `--evidencia-*`:
 el script lo hace constar en la tabla de fuentes. Salida `2` → defectos en el
-contenido (marca inválida, hecho ✓ sin fuente, id de limitación inexistente):
-**se corrige el JSON, nunca el script**, y se relanza.
+contenido (marca inválida, hecho ✓ sin fuente, id de limitación inexistente) o en
+una copia de los agentes (la misma comprobación del paso 5): **se corrige el JSON,
+nunca el script**, y se relanza.
+
+**Y termina con el apartado «Utilización de herramientas de inteligencia artificial»**,
+con una marca en la cabecera, junto a Realizado y Verificado: la evidencia de que el informe
+se hizo con una herramienta de IA, de qué se le facilitó y de cómo debe verificarse. Dice que
+el informe lo ha compuesto la herramienta a partir de lo que devolvieron los agentes, con cada
+hecho citado a su fuente, y que la denominación y el CIF salieron a búsquedas en fuentes
+públicas de internet por los agentes (eso el MCP no lo ve, así que lo declara el script). Las
+comprobaciones que lista —el CIF y su registro, hechos con fuente, incertidumbre de los
+indicios, fuentes desde las respuestas de los agentes, el cotejo de cada copia con su
+recuento, agentes sin evidencia, avisos— las calcula el script
+sobre el propio informe. Los apartados de la herramienta quedan con huecos que se rellenan al
+archivar (paso 8); los de verificación, verificado por, efecto en la conclusión y revisión
+**son del equipo y salen en blanco**. No escribas nada en ellos ni propongas texto para ellos.
+
+<!-- solo-cowork:entrega -->
+**En Cowork el script escribe en el sandbox, no en el expediente**, así que la ruta de destino
+no se cumple sola: hay que bajar el Word. Se envía con `SendUserFile`, que devuelve un
+`file_uuid`, y con `device_commit_files` se escribe en el disco del auditor:
+
+```
+device_commit_files → "<expediente>/AsistenteIA/InvestigacionEntidad/<informe>.docx"
+```
+
+**Solo el Word, por su nombre exacto, nunca con un comodín**: en el directorio de trabajo
+están también `informe.json` y los tres JSON de los agentes, que no van al expediente.
+<!-- /solo-cowork -->
 
 ### Paso 8 — Entregar
 
-Di dónde han quedado el informe y la evidencia, resume en tres líneas lo más
-relevante de cada bloque, y recuerda que el informe recopila y cruza información
-pública: la evaluación del efecto en el encargo es del auditor. Si algún agente
-se degradó (paso 4), dilo aquí también, no solo dentro del informe.
+**Con el informe ya en el disco del auditor**, en
+`<expediente>\AsistenteIA\InvestigacionEntidad\`, séllalo:
 
-**Los temporales.** Borra el directorio de trabajo (`rm -rf "$TMPI"`). Si el
-entorno no deja borrar (en Cowork pasa), di la ruta exacta de lo que queda: en
-`AsistenteIA` solo deben quedar el informe y la evidencia.
+```
+sellar_uso_ia(ruta = "<expediente>/AsistenteIA/InvestigacionEntidad/<fichero>.docx",
+              modelo = "<el modelo con el que trabajas>",
+              procedimiento = "investigacion-entidad")
+```
+
+Rellena en el apartado de uso de IA lo que solo sabe la aplicación: herramienta y versiones,
+quién lo ejecutó, dónde corrieron los scripts y **qué información se facilitó y cómo**, según
+lo que el MCP ha servido desde el paso 1. `procedimiento` es el mismo perfil del paso 1, y es
+lo que le dice al MCP de qué procedimiento tiene que listar lo facilitado. En `modelo` pon el
+nombre y la versión que te da tu propio contexto; si no lo sabes, déjalo vacío. **Sin esta
+llamada el informe queda con huecos que dicen «pendiente»**: no se da por entregado.
+
+**Si en algún momento el MCP avisó de otra conversación con otro expediente o perfil en el
+mismo servidor** (paso 1) y el auditor decidió seguir, recuérdaselo al entregar: es lo primero
+que tiene que mirar si el apartado de uso de IA lista algo que este procedimiento no usó.
+
+Di dónde ha quedado el informe, resume en tres líneas lo más
+relevante de cada bloque, y recuerda que el informe recopila y cruza información
+pública: la evaluación del efecto en el encargo es del auditor. Recuérdale también
+que el apartado de uso de IA deja la verificación, quién la hace, su efecto en la
+conclusión y la revisión en blanco para el equipo: mientras lo estén, el informe no
+es evidencia de auditoría. Si algún agente se degradó (paso 4), dilo aquí también,
+no solo dentro del informe.
+
+**Los temporales.** Borra el directorio de trabajo —con los tres JSON de los agentes y
+`informe.json`— **desde fuera**, sin haber hecho `cd` a él (si lo hiciste, sal antes), y
+**con la ruta literal que anotaste al crearlo** en el paso 5, escrita entera:
+
+```bash
+rm -rf "<la ruta que anotaste>"
+```
+
+<!-- solo-cowork -->Ni `"$TRABAJO"` —en un entorno que no conserva variables llega vacía— ni
+`"$(cat <fichero>)"`: un borrado recursivo cuya ruta se calcula en el momento no se puede
+revisar antes de lanzarlo, y en Cowork la seguridad lo bloquea (registro del 21/10/2026).<!-- /solo-cowork -->
+
+Si el entorno no deja borrar, di la ruta exacta de lo que queda. En
+`AsistenteIA\InvestigacionEntidad\` solo debe quedar el Word. Este procedimiento no exporta
+nada con `exportar_consulta`, así que no hay volcados del MCP que limpiar.
 
 ---
 
@@ -300,17 +461,27 @@ entorno no deja borrar (en Cowork pasa), di la ruta exacta de lo que queda: en
 - **No identifica riesgos NIA 315**: eso es `identificacion-riesgos`, con las
   cifras del expediente. Este skill le da contexto externo, no lo sustituye.
 - **No escribe en el expediente de Gesia.**
+- **No verifica su propio resultado por el equipo.** Propone qué contrastar; la verificación,
+  quién la hace y su efecto en la conclusión los escribe el equipo en el apartado de uso de IA.
 
 ## Degradación
 
 | Situación | Qué sale |
 |---|---|
 | Servidor API de Gesia caído o sin expediente | se pregunta el nombre al usuario y se sigue igual |
+| El MCP avisa de otra conversación con otro expediente o perfil en el mismo servidor | se le dice al auditor tal cual y **no se sigue hasta que confirme** |
 | `NIF` vacío en `DatosAuditoria` (lo normal) | se busca el CIF en internet por el nombre y el usuario confirma la candidata |
 | Varias candidatas con nombres parecidos | se enseñan todas y elige el usuario |
 | Ninguna candidata, o el usuario no reconoce ninguna | se le pide el CIF; si no lo tiene, **para** |
 | CIF con control inválido | se descarta esa candidata; si era el indicado por el usuario, **para** |
 | DNI/NIE en vez de CIF | **para.** Fuera del alcance |
 | Un agente falla o devuelve JSON inválido | un reintento; después, sección en ○ con limitación explícita |
+| La copia de un JSON no carga o no cuadra con su `recuento` (`--comprobar`, salida 2) | se vuelve a copiar del mensaje del agente, entero, y se repite la comprobación |
+| Un agente no declara `recuento` | se sigue; el informe dice con ATENCIÓN que esa respuesta no se pudo cotejar |
+| Una búsqueda web general trae la URL de una página | la sección 8 la presenta sin URL y lo dice con ATENCIÓN |
+| La búsqueda de la referencia no da una sola fila | segunda búsqueda más amplia y se pregunta enseñando las candidatas; nunca un código que no salga de `Referencias` de este expediente |
+| El usuario da un código de referencia | se comprueba en `Referencias` y se le enseña su nombre antes de usarlo; si no existe, no se usa |
 | Homonimia señalada por un agente | se traslada al usuario antes del informe; su decisión consta en Limitaciones |
 | Sin hallazgos en todas las fuentes | informe igualmente, con las fuentes y fechas consultadas |
+| `sellar_uso_ia` dice que no hay huecos | el informe ya estaba sellado o no es el que escribió el script: no lo repitas, dilo |
+| `sellar_uso_ia` dice que no tiene constancia de lo facilitado | o no se sirvió nada por el plugin, o el MCP se reinició a mitad: el informe lo dice y remite a `RegistroEmision.jsonl`; cuéntaselo al auditor tal cual |

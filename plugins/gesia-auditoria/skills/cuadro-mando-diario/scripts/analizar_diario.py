@@ -36,7 +36,11 @@ from pathlib import Path
 
 import pandas as pd
 
-import lib_diario as LD
+# La carpeta del script, antes de los imports locales: con `python -I` (modo aislado) Python no
+# la pone en sys.path y los modulos hermanos no se encuentran.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import lib_diario as LD  # noqa: E402
 
 MAX_LISTA = 10
 Z_ATIPICO = 3.5          # z robusto (Iglewicz-Hoaglin) para marcar un dia

@@ -48,9 +48,19 @@ directorio de trabajo. Guárdalo al empezar y úsalo siempre:
 
 ```bash
 SKILL="<directorio base indicado al cargar el skill>"
-TRABAJO="$(pwd)/trabajo" && mkdir -p "$TRABAJO"
+TRABAJO="$(mktemp -d "${TMPDIR:-/tmp}/cuadro-mando-XXXX")" && echo "$TRABAJO"   # uno NUEVO en cada ejecución
 python3 "$SKILL/scripts/verificar_contrato.py" "$TRABAJO/diario.mdb" ...
 ```
+
+**Anota la ruta que imprime**: si el entorno no conserva variables entre llamadas, vuelve a
+escribir `TRABAJO="<esa ruta>"` al principio de cada orden —y lo mismo `SKILL`—, sin crear otro.
+Esa ruta anotada es también la que se borra al final, escrita literal (paso 10).
+
+**Un directorio de trabajo nuevo en cada ejecución**, aunque otra ejecución haya dejado uno en la
+sesión: reutilizarlo mezcla el diario y los JSON de otro expediente con los de este, y el panel
+los tomaría por suyos. **No hagas `cd` dentro, ni al del skill**: todo con rutas absolutas
+(`"$SKILL/scripts/…"`, `"$TRABAJO/…"`), para poder borrarlo entero desde fuera al terminar
+(paso 10).
 
 **No copies los scripts al directorio de trabajo.** `generar_panel.py` localiza la
 plantilla como `../assets/` respecto a su propio fichero, así que `scripts/` y `assets/`
@@ -83,12 +93,21 @@ vuelvas a encender tú.
 - La ruta del diario sale de `smn_file` en la respuesta. **Nunca la construyas tú**:
   el skill analiza el diario que Gesia tiene vinculado, y solo ese.
 
+**Si `configurar` trae `aviso_otra_conversacion`** —hace poco se trabajaba en el mismo servidor
+con otro expediente o con otro perfil—, mira primero si fue **esta** conversación: si aquí mismo
+acabas de ejecutar otro procedimiento, es eso y se sigue sin decir nada. Si no, díselo al
+auditor tal cual y **no sigas hasta que confirme que la otra conversación ha terminado**: en
+Cowork todas comparten un mismo MCP y se pisan el expediente activo, el perfil, la cuenta de lo
+facilitado y los ficheros de trabajo.
+
 ```
 contexto_expediente()
 ```
 
-De aquí salen `RazonSocialCliente`, `FechaCierre` e **`IR_T`** (la importancia relativa
-de trabajo), que es el ancla de todos los umbrales del panel.
+**Siempre, justo después de `configurar`, aunque ya lo tengas en la conversación** —de otro
+procedimiento o de una ejecución anterior—: lo leído con otro perfil no cuenta para este, y
+puede ser de otro expediente. De aquí salen `RazonSocialCliente`, `FechaCierre` e **`IR_T`** (la
+importancia relativa de trabajo), que es el ancla de todos los umbrales del panel.
 
 ### Paso 2 — Traer el plan de cuentas del expediente
 
@@ -101,48 +120,49 @@ WHERE Val(Digitos)=3 AND (SaldoCliente<>0 OR SaldoAnterior<>0 OR SaldoAj<>0)
 ORDER BY Cuenta
 ```
 
-Guarda la respuesta **tal cual** en `<trabajo>/cuentas_gesia.json`. De la fila de la
+Guarda la respuesta **tal cual** en `"$TRABAJO/cuentas_gesia.json"`: el JSON íntegro, copiado,
+sin transcribir importes a mano. De la fila de la
 cuenta **`080`** salen tres cifras que alimentan la cabecera del panel:
 `SaldoCliente` (resultado del ejercicio), `SaldoAnterior` (ejercicio precedente) y
 `SaldoAj` (ajustes de auditoría).
 
 ### Paso 3 — Traer el diario al contenedor
 
-> **Corregido el 27/08/2026 — la ruta de este bloque ya no es válida.**
-> `device_stage_files` solo sube ficheros que estén **dentro de una carpeta conectada** a
-> la sesión, y el `$TEMP` de Windows no lo está: desde ahí no se puede subir. El
-> comprimido tiene que escribirse en una subcarpeta de trabajo de la raíz de la carpeta
-> conectada —`<raíz conectada>\_tmp_cowork\`—, nunca dentro del expediente, y borrarse al
-> terminar. Lo que sigue valía cuando el mecanismo admitía cualquier ruta; el resto del
-> bloque (comprimir, los límites de tamaño) sigue vigente. Ver `docs/arquitectura.md`.
-
 El `.smn` es una base Access JET4. Directo **da tiempo de espera**: el presupuesto de
 transferencia de `device_stage_files` es de unos 50 segundos y un diario de un ejercicio
 no cabe. Medido: 11 MB no pasan, y 6,98 MB tampoco; comprimidos son 1,17-2 MB y sí pasan.
 
+`device_stage_files` solo sube ficheros que estén **dentro de una carpeta conectada** a la
+sesión: el `$TEMP` de Windows no lo está, y desde ahí no se puede subir. El comprimido se
+escribe en una subcarpeta de trabajo de la **raíz** de la carpeta conectada, nunca dentro del
+expediente:
+
 ```bash
-# en la máquina del usuario
-mkdir -p "<expediente>/AsistenteIA/CuadroMandoDiario"
-gzip -c "<smn_file>" > "$TEMP/gesia-cuadro-mando/diario.smn.gz"
+# en el equipo del auditor (device_bash), con las rutas tal como las monta
+mkdir -p "<expediente>/AsistenteIA/CuadroMandoDiario" "<raíz conectada>/_tmp_cowork"
+gzip -c "<smn_file>" > "<raíz conectada>/_tmp_cowork/diario.smn.gz"
 ```
 
-Luego `device_stage_files` con esa ruta, y en el contenedor:
+Luego `device_stage_files` de **ese fichero, por su nombre exacto** —nunca con comodín: en
+`_tmp_cowork` puede haber exportaciones de otros procedimientos—. **Si falla por permisos**,
+pide acceso con `device_request_folder_access` sobre la raíz de la carpeta conectada y repite
+**una sola vez**; si vuelve a fallar, para y díselo al auditor con la ruta. Lo subido aparece
+como `/mnt/user-data/uploads/<carpeta conectada>/_tmp_cowork/diario.smn.gz`. En el contenedor:
 
 ```bash
 which mdb-export || apt-get install -y mdbtools
-gunzip -c "<staged>/diario.smn.gz" > <trabajo>/diario.mdb
+gunzip -c "<lo subido>/diario.smn.gz" > "$TRABAJO/diario.mdb"
 ```
 
-**El temporal va a la carpeta temporal del sistema, no a `AsistenteIA`.** En el
-expediente solo se archivan papeles de trabajo; un `.gz` con la contabilidad del cliente al
-lado del panel firmado es contabilidad ajena en una carpeta que se archiva. Y al terminar se
-borra, en el paso de entrega.
+**El temporal no va a `AsistenteIA`.** En el expediente solo se archivan papeles de trabajo;
+un `.gz` con la contabilidad del cliente al lado del panel firmado es contabilidad ajena en una
+carpeta que se archiva. Y al terminar se borra, en el paso de entrega.
 
 ### Paso 4 — Contrato del diario (puede abortar)
 
 ```bash
-python3 scripts/verificar_contrato.py <trabajo>/diario.mdb \
-  --json <trabajo>/contrato.json --cierre <FechaCierre> --ir-t <IR_T> \
+python3 "$SKILL/scripts/verificar_contrato.py" "$TRABAJO/diario.mdb" \
+  --json "$TRABAJO/contrato.json" --cierre <FechaCierre> --ir-t <IR_T> \
   --resultado-08=<SaldoCliente de 080> \
   --resultado-anterior=<SaldoAnterior de 080> \
   --ajustes=<SaldoAj de 080>
@@ -161,9 +181,9 @@ como una opción.
 ### Paso 5 — Conciliación con el expediente
 
 ```bash
-python3 scripts/conciliar_gesia.py <trabajo>/diario.mdb \
-  --cuentas <trabajo>/cuentas_gesia.json --nivel 3 --ir-t <IR_T> \
-  --json <trabajo>/conciliacion.json
+python3 "$SKILL/scripts/conciliar_gesia.py" "$TRABAJO/diario.mdb" \
+  --cuentas "$TRABAJO/cuentas_gesia.json" --nivel 3 --ir-t <IR_T> \
+  --json "$TRABAJO/conciliacion.json"
 ```
 
 Si devuelve **2** (descuadres materiales) el panel **se genera igual** —lleva una tarjeta
@@ -173,8 +193,8 @@ trabajo válido** hasta resolverlos.
 ### Paso 6 — Punteo y partidas abiertas
 
 ```bash
-python3 scripts/analizar_punteo.py <trabajo>/diario.mdb \
-  --cierre <FechaCierre> --ir-t <IR_T> --json <trabajo>/punteo.json
+python3 "$SKILL/scripts/analizar_punteo.py" "$TRABAJO/diario.mdb" \
+  --cierre <FechaCierre> --ir-t <IR_T> --json "$TRABAJO/punteo.json"
 ```
 
 Devuelve 2 si no hay punteo o si el aging queda suprimido. **No es un error**: el panel
@@ -183,21 +203,21 @@ degrada y lo explica. Sigue adelante.
 ### Paso 7 — Análisis del diario
 
 ```bash
-python3 scripts/analizar_diario.py <trabajo>/diario.mdb \
-  --cierre <FechaCierre> --ir-t <IR_T> --json <trabajo>/analisis.json
+python3 "$SKILL/scripts/analizar_diario.py" "$TRABAJO/diario.mdb" \
+  --cierre <FechaCierre> --ir-t <IR_T> --json "$TRABAJO/analisis.json"
 ```
 
 ### Paso 8 — Generar el panel
 
 ```bash
-python3 scripts/generar_panel.py \
-  --contrato <trabajo>/contrato.json \
-  --conciliacion <trabajo>/conciliacion.json \
-  --punteo <trabajo>/punteo.json \
-  --analisis <trabajo>/analisis.json \
+python3 "$SKILL/scripts/generar_panel.py" \
+  --contrato "$TRABAJO/contrato.json" \
+  --conciliacion "$TRABAJO/conciliacion.json" \
+  --punteo "$TRABAJO/punteo.json" \
+  --analisis "$TRABAJO/analisis.json" \
   --cliente "<RazonSocialCliente>" --cierre <FechaCierre> \
   --generado "$(date -I)" --ir-t <IR_T> \
-  --salida <trabajo>/panel.html
+  --salida "$TRABAJO/panel.html"
 ```
 
 `--generado` se pasa como parámetro y ningún script lee el reloj por su cuenta: así el
@@ -209,13 +229,15 @@ Abre el HTML en Chromium y comprueba que **no hay errores de consola**. Una capt
 el validador de datos no ve la maquetación.
 
 ```bash
-node <trabajo>/verificar_panel.js     # plantilla en assets/verificar_panel.js
+node "$SKILL/assets/verificar_panel.js" "$TRABAJO/panel.html" "$TRABAJO/panel"   # capturas en $TRABAJO
 ```
 
 ### Paso 10 — Entregar
 
-1. `SendUserFile` del `panel.html` y de los cuatro JSON.
-2. `device_commit_files` de todos ellos a
+1. `SendUserFile` del `panel.html` y de los cuatro JSON (`contrato`, `conciliacion`, `punteo`,
+   `analisis`), **cada uno por su nombre exacto** —nunca con comodín: en `$TRABAJO` están
+   también el `diario.mdb`, `cuentas_gesia.json` y las capturas, que no se archivan—.
+2. `device_commit_files` de esos cinco a
    `<expediente>\AsistenteIA\CuadroMandoDiario\` —la regla del proyecto de una
    subcarpeta por skill, y esta es la única ruta donde el auditor los va a buscar—, con
    nombres que incluyan cliente y fecha de cierre:
@@ -225,12 +247,27 @@ node <trabajo>/verificar_panel.js     # plantilla en assets/verificar_panel.js
    —el `.html` y los cuatro `.json`—: sustituye los tokens por los nombres reales en local y
    devuelve recuentos, ni un nombre vuelve aquí. Dile al auditor cuántas sustituciones y, si
    hay `tokens_sin_nombre`, cuáles, sin completarlos tú. Delante de él no se dice
-   «rehidratar»: se dice **desanonimizar**, y se le recuerda que la copia del chat está
-   anonimizada y la buena es la del expediente.
+   «rehidratar»: se dice **recuperar los nombres**, y se le recuerda que la copia del chat
+   está seudonimizada y la buena es la del expediente.
 4. **Nunca** publiques el panel como artefacto ni lo subas a ninguna URL.
-5. **Borra los temporales**: `rm -rf "$TEMP/gesia-cuadro-mando" <trabajo>`. En
-   `AsistenteIA` solo debe quedar el panel y sus JSON. Si algo no se deja borrar, dilo con
-   su ruta: son datos del cliente y no pueden quedarse por olvido.
+5. **Borra los temporales**, que son datos del cliente:
+   - `limpiar_exportaciones(procedimiento = "cuadro-mando-diario")` borra lo que el MCP haya
+     exportado para este procedimiento, y solo eso: lo de otro procedimiento puede ser de otra
+     conversación en marcha. Si la respuesta trae `de_otros_procedimientos`, esos ficheros no se
+     tocan porque pueden ser de otra conversación en marcha: díselo al auditor en una línea. Si
+     trae un `aviso` de ficheros que la herramienta no ha escrito (`no_escritos_por_mi`), dile la
+     carpeta y que los mire si alguno es de hoy: una exportación lleva datos del cliente.
+   - El comprimido lo escribiste tú, así que `limpiar_exportaciones` no lo ve: bórralo en el
+     equipo del auditor (`device_bash`), **por su nombre exacto**:
+     `rm -f "<raíz conectada>/_tmp_cowork/diario.smn.gz"`.
+   - El directorio de trabajo se borra entero **desde fuera** —no estás dentro, no hiciste
+     `cd`—, **con la ruta que anotaste al crearlo, escrita literal**:
+     `rm -rf "<la ruta que anotaste al crearlo>"`. Nunca con una variable ni con `$(cat …)`: si
+     el entorno no conserva variables, `"$TRABAJO"` llega vacío, y el control de seguridad del
+     entorno bloquea un `rm -rf` sobre una expansión como `"$(cat …)"` (registro del 21/10/2026).
+
+   En `AsistenteIA` solo debe quedar el panel y sus JSON. Si algo no se deja borrar, dile al
+   auditor la ruta: son datos del cliente y no pueden quedarse por olvido.
 
 Los cinco JSON reproducen el panel sin volver a leer el `.smn`: si hay que regenerarlo con
 otro umbral, basta el paso 8.
@@ -340,7 +377,7 @@ scripts/probar_*.py           arneses de prueba (38 comprobaciones en total)
 Los arneses se ejecutan si se toca algún módulo:
 
 ```bash
-python3 scripts/probar_degradacion.py <diario.mdb>     # 13 escenarios
-python3 scripts/probar_conciliacion.py <diario.mdb> <cuentas.json>   # 10 casos
-python3 scripts/probar_punteo.py <diario.mdb>          # 15 comprobaciones
+python3 "$SKILL/scripts/probar_degradacion.py" <diario.mdb>     # 13 escenarios
+python3 "$SKILL/scripts/probar_conciliacion.py" <diario.mdb> <cuentas.json>   # 10 casos
+python3 "$SKILL/scripts/probar_punteo.py" <diario.mdb>          # 15 comprobaciones
 ```

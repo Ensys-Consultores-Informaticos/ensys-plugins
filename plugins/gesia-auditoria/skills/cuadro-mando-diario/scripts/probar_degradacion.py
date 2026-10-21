@@ -18,8 +18,12 @@ from pathlib import Path
 
 import pandas as pd
 
-import lib_diario as LD
-import verificar_contrato as VC
+# La carpeta del script, antes de los imports locales: con `python -I` (modo aislado) Python no
+# la pone en sys.path y los modulos hermanos no se encuentran.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import lib_diario as LD  # noqa: E402
+import verificar_contrato as VC  # noqa: E402
 
 
 # Datos que aporta un expediente real (cuenta 08 e IR_T).

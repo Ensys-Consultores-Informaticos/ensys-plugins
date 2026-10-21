@@ -9,7 +9,7 @@ Hay **dos plugins** y se instala **uno solo**:
 | Plugin | Para quién | Qué lleva |
 |---|---|---|
 | **Gesia — Expediente de auditoría** | Quien tiene la suite de Gesia | Todos los procedimientos, incluidas las pruebas de muestreo de ForSampling |
-| **ForSampling — Pruebas de muestreo** | Quien tiene ForSampling sin Gesia | Las pruebas de muestreo, el papel de la NIA-ES 530 y el registro de ejecución |
+| **ForSampling — Pruebas de muestreo** | Quien tiene ForSampling sin Gesia | Las pruebas de muestreo y el registro de ejecución |
 
 Los dos comparten el programa que lee los ficheros, y con los dos activos no se sabe cuál
 contesta. Si pasa, el propio plugin lo avisa al empezar y dice cuál sobra.
@@ -96,7 +96,7 @@ Dos cosas que fallan a menudo, y las dos son del entorno, no del plugin:
 
 Requiere **Windows**, y Gesia o ForSampling instalado. El expediente, el cliente de
 muestreo y el diario se leen en tu equipo: **ningún dato del cliente auditado sale de
-ahí** sin pasar antes por la anonimización que se explica más abajo.
+ahí** sin pasar antes por la seudonimización que se explica más abajo.
 
 ## Qué incluye
 
@@ -109,7 +109,6 @@ La columna de la derecha dice qué lleva el plugin de ForSampling; el de Gesia l
 | **Estados financieros** | Balance y cuenta de resultados comparados de los ejercicios cargados, con la conciliación de lo que presenta el cliente a lo auditado —epígrafe a epígrafe y cuenta a cuenta—, el movimiento del patrimonio neto, y el estado de flujos de efectivo del módulo EFE con sus ajustes. Cuando no hay ningún ajuste aprobado, propone los importes cuyo criterio puede contrastar y lo entrega marcado como borrador | Cuatro papeles de trabajo en Excel | — |
 | **Prueba de cumplimiento (ForSampling)** | Localiza el documento de cada elemento de la muestra, comprueba lo que el documento sostiene y propone el veredicto por atributo | Papel de trabajo en Excel | Sí |
 | **Prueba MUM (ForSampling)** | Mide el importe que sostiene cada factura de la muestra y propone el saldo según auditoría, el error y la tasa de error | Papel de trabajo en Excel | Sí |
-| **Papel de la NIA-ES 530** | Redacta en Word el papel de trabajo de una prueba MUM: objetivo, población, parámetros del diseño, selección, resultados por elemento y lo que falta, todo leído de los ficheros de ForSampling. Deja la conclusión en blanco, que es del auditor | Papel de trabajo en Word | Sí |
 | **Cancelación de saldos** | Empareja las facturas de una cuenta con sus pagos o cobros y deja a la vista lo que queda pendiente de verdad. Respeta el punteo que ya trae el diario y completa el resto | Papel de trabajo en Excel | — |
 | **Continuidad de saldos de apertura** | Compara cuenta por cuenta la apertura del diario con el cierre auditado del ejercicio anterior (NIA-ES 510) | Papel de trabajo en Excel | — |
 | **Identificación de riesgos** | Elige los riesgos del encargo del catálogo de tu máster, a partir del balance, la cuenta de resultados y los ratios de los cinco ejercicios (NIA-ES 315) | Informe en Word | — |
@@ -136,7 +135,6 @@ No hace falta recordar nombres. Basta decir lo que quieres:
 - «identifica los riesgos de este encargo»
 - «investiga a este cliente en fuentes públicas»
 - «valida la muestra de compras contra las facturas»
-- «haz el papel de la NIA 530 de la MUM»
 
 Si dices solo «cuentas anuales» te preguntará a cuál de las dos cosas te
 refieres: al **contenido de la memoria**, que necesita el PDF del cliente, o a
@@ -149,14 +147,27 @@ diario, y cada comprobación dice de dónde sale; pero la valoración, el alcanc
 la conclusión son del auditor, que es quien firma. Ningún papel se entrega sin
 que se hayan contado los avisos que hayan salido durante su preparación.
 
+**Cada papel deja constancia del uso de IA.** Lleva una hoja o un apartado
+«Utilización de herramientas de inteligencia artificial» con la herramienta y su versión,
+lo que se le pidió, qué información del cliente se le facilitó y cómo —seudonimizada o en
+claro—, el resultado y lo que comprobó ella misma. La verificación, quién la hace, su
+efecto en la conclusión y la revisión quedan **en blanco para el equipo**: mientras lo
+estén, el papel lo avisa y no es evidencia de auditoría.
+
+**Un procedimiento de Gesia a la vez.** Todas las conversaciones de Cowork abiertas comparten
+el mismo programa que lee el expediente: si lanzas dos procedimientos en dos conversaciones a
+la vez, se pisan el expediente activo y los ficheros de trabajo. Termina uno antes de empezar
+otro. Si el asistente te avisa de que otra conversación está trabajando, ciérrala o espera a
+que acabe.
+
 ## Versión publicada
 
-**2.0.7**, con el programa que lee el expediente en la **1.24.5**.
+**2.1.0**, con el programa que lee el expediente en la **1.26.2**.
 
 Lo que conviene saber para usarlo con criterio, porque es lo que no se puede deducir mirando
 el resultado:
 
-- **Los nombres de proveedores y clientes viajan anonimizados.** El asistente ve un código por
+- **Los nombres de proveedores y clientes viajan seudonimizados.** El asistente ve un código por
   cuenta, no la razón social, y el papel de trabajo recupera los nombres reales en tu equipo al
   entregarlo.
 - **Las facturas escaneadas se tachan en tu equipo antes de subirlas.** Los PDF no salen de tu
