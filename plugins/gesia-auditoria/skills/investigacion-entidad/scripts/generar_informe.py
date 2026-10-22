@@ -434,13 +434,13 @@ def main() -> int:
     p.add_argument("--evidencia-riesgos")
     p.add_argument("--cliente")
     p.add_argument("--cif")
-    # De donde salio el CIF. Desde la 2.0.5 la investigacion parte del nombre del expediente
-    # y, si Gesia no tiene el CIF -medido el 05/10/2026: la columna NIF vacia en los 19
-    # expedientes de prueba-, lo busca en internet y lo confirma el auditor. Un informe sobre
-    # la entidad equivocada es el peor resultado posible, asi que el papel dice como se
-    # identifico, y no se puede omitir.
+    # De donde salio el CIF. La investigacion parte del nombre del expediente y el CIF lo busca
+    # en internet y lo confirma el auditor: Gesia no lo guarda (la columna NIF de DatosAuditoria
+    # es, desde hace varias versiones, el sector; 22/10/2026). Un informe sobre la entidad
+    # equivocada es el peor resultado posible, asi que el papel dice como se identifico, y no
+    # se puede omitir.
     p.add_argument("--cif-origen",
-                   help="p. ej. 'expediente de Gesia', 'indicado por el auditor' o "
+                   help="p. ej. 'indicado por el auditor' o "
                         "'BORME (enlace), confirmado por el auditor'")
     # El registro que corresponde a la entidad por la letra de su CIF (validar_cif.py).
     # La cabecera decia «BORME/BOE» a todo el mundo, tambien a una fundacion (05/10/2026).
@@ -578,7 +578,7 @@ def main() -> int:
     # ── Evidencia del uso de IA (lib_uso_ia, docs/evidencia-uso-ia.md) ────────
     # Lo central aqui no pasa por el MCP: la denominacion y el CIF viajan a internet por los
     # agentes. Eso lo declara el papel en informacion_adicional; lo servido por el MCP
-    # (contexto_expediente, la consulta del NIF) lo lista sellar_uso_ia.
+    # (contexto_expediente, las consultas de Referencias) lo lista sellar_uso_ia.
     degradados = [b.lower() for b, d in evidencias.items() if d is None]
     adicional = [
         "La denominación y el CIF de la entidad se han enviado a búsquedas en fuentes públicas de "

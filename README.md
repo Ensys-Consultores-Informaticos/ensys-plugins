@@ -104,7 +104,6 @@ La columna de la derecha dice qué lleva el plugin de ForSampling; el de Gesia l
 
 | Skill | Qué hace | Entregable | ForSampling |
 |---|---|---|---|
-| **Cuadro de mando del diario** | Verifica el diario, lo concilia con los saldos del expediente y analiza punteo y apuntes atípicos | Panel HTML | — |
 | **Revisión del contenido de la memoria** | Contesta el cuestionario de cuentas anuales a partir de las cuentas en PDF, justificando cada respuesta | Excel para importar en Gesia + papel en Word | — |
 | **Estados financieros** | Balance y cuenta de resultados comparados de los ejercicios cargados, con la conciliación de lo que presenta el cliente a lo auditado —epígrafe a epígrafe y cuenta a cuenta—, el movimiento del patrimonio neto, y el estado de flujos de efectivo del módulo EFE con sus ajustes. Cuando no hay ningún ajuste aprobado, propone los importes cuyo criterio puede contrastar y lo entrega marcado como borrador | Cuatro papeles de trabajo en Excel | — |
 | **Prueba de cumplimiento (ForSampling)** | Localiza el documento de cada elemento de la muestra, comprueba lo que el documento sostiene y propone el veredicto por atributo | Papel de trabajo en Excel | Sí |
@@ -112,7 +111,7 @@ La columna de la derecha dice qué lleva el plugin de ForSampling; el de Gesia l
 | **Cancelación de saldos** | Empareja las facturas de una cuenta con sus pagos o cobros y deja a la vista lo que queda pendiente de verdad. Respeta el punteo que ya trae el diario y completa el resto | Papel de trabajo en Excel | — |
 | **Continuidad de saldos de apertura** | Compara cuenta por cuenta la apertura del diario con el cierre auditado del ejercicio anterior (NIA-ES 510) | Papel de trabajo en Excel | — |
 | **Identificación de riesgos** | Elige los riesgos del encargo del catálogo de tu máster, a partir del balance, la cuenta de resultados y los ratios de los cinco ejercicios (NIA-ES 315) | Informe en Word | — |
-| **Investigación de la entidad** | Investiga al cliente en fuentes públicas de internet —BORME, contratación pública, subvenciones, jurisprudencia y prensa— con tres agentes en paralelo, citando cada hecho a su fuente y declarando lo que no consta | Papel de trabajo en Word + evidencia JSON | — |
+| **Investigación de la entidad** | Investiga al cliente en fuentes públicas de internet —BORME, contratación pública, subvenciones, jurisprudencia y prensa— con tres agentes en paralelo, citando cada hecho a su fuente y declarando lo que no consta | Papel de trabajo en Word | — |
 | **Registro de ejecución** | Escribe en el chat, de forma anónima, cómo ha ido un procedimiento: con qué tropezó y qué convendría mejorar. Sirve para reportarnos incidencias sin tener que explicarlas | Texto en el chat | Sí |
 
 Los entregables se escriben en `AsistenteIA\<carpeta del procedimiento>`
@@ -128,7 +127,6 @@ Gesia**, basta con indicar dónde está.
 
 No hace falta recordar nombres. Basta decir lo que quieres:
 
-- «lanza el cuadro de mando del diario»
 - «revisa la memoria de este cliente» (adjuntando las cuentas anuales en PDF)
 - «saca el balance comparado» o «revisa el estado de flujos del expediente»
 - «comprueba los saldos de apertura»
@@ -162,7 +160,7 @@ que acabe.
 
 ## Versión publicada
 
-**2.1.1**, con el programa que lee el expediente en la **1.26.3**.
+**2.1.2**, con el programa que lee el expediente en la **1.26.3**.
 
 Lo que conviene saber para usarlo con criterio, porque es lo que no se puede deducir mirando
 el resultado:

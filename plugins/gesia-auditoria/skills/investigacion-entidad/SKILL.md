@@ -25,7 +25,7 @@ hechos societarios, vínculos con el sector público, riesgos legales y
 reputacionales — **cada uno con su fuente, y los huecos declarados**.
 
 Es el primer skill del plugin que usa **agentes**: tres investigadores en
-paralelo (`agents/` del plugin), cada uno con su contrato JSON. El análisis y la
+paralelo (<!-- solo-cowork:alt=sus instrucciones están en `agentes/`, dentro de este skill -->`agents/` del plugin<!-- /solo-cowork -->), cada uno con su contrato JSON. El análisis y la
 redacción NO se delegan: son tuyos, en el contexto principal, donde el usuario
 puede corregirlos.
 
@@ -61,9 +61,27 @@ hoy no es reproducible mañana: lo que hace defendible el informe es que **cada 
 lleva su fuente** y que **la sección 8 recoge cada fuente consultada con su URL y su
 fecha de consulta**, junto con los avisos de los agentes sobre su búsqueda. Los JSON
 de los agentes son la entrada de `generar_informe.py`, que construye desde ellos esa
-sección: viven en el directorio de trabajo y se borran con él. **No se archivan**: en
+sección: viven en el directorio de trabajo y se borran con él. **No se archivan**<!-- solo-cowork -->: en
 Cowork los agentes no escriben ficheros y su JSON llega como mensaje, así que guardarlo
-era retranscribirlo a mano, y una copia retranscrita no acredita más que el papel.
+era retranscribirlo a mano, y una copia retranscrita no acredita más que el papel<!-- /solo-cowork -->.
+
+---
+
+## Dónde están los scripts
+
+```bash
+SKILL="<directorio base indicado al cargar el skill>"
+TRABAJO="$(mktemp -d "${TMPDIR:-/tmp}/investigacion-XXXX")" && echo "$TRABAJO"
+```
+
+Un directorio de trabajo **nuevo en cada ejecución**, en la carpeta temporal del sistema y
+**nunca en `AsistenteIA`**. Créalo al empezar: los JSON de los agentes van a él (paso 5).
+
+**Anota la ruta que imprime**; si el entorno no conserva variables entre llamadas, vuelve a
+escribir `SKILL="…"` y `TRABAJO="<esa ruta>"` al principio de cada orden, sin crear otro
+directorio. No la guardes en un fichero para leerla luego con `$(cat …)`: al final se borra
+con la ruta escrita tal cual (paso 8). **No hagas `cd` a él**; trabaja con rutas completas:
+al final se borra desde fuera, y el entorno no deja borrar el directorio en el que estás.
 
 ---
 
@@ -81,7 +99,7 @@ contexto_expediente()
 **El perfil va lo primero**: marca el comienzo del procedimiento, y desde ahí el MCP lleva
 la cuenta de lo que se facilita a la herramienta, que es lo que el informe dirá en su apartado
 de uso de IA. Este perfil no seudonimiza nada: la búsqueda necesita el nombre de la entidad
-tal cual, y lo que se lee del expediente —razón social, cierre, NIF— no lleva terceros.
+tal cual, y lo que se lee del expediente —razón social y cierre— no lleva terceros.
 
 **`contexto_expediente()` va siempre, después del perfil, aunque ya lo tengas en la
 conversación.** Lo que se leyó antes con otro perfil cuenta para aquel procedimiento, no para
@@ -98,20 +116,14 @@ De ahí salen la razón social (`RazonSocialCliente`) y la fecha de cierre. **No
 pidas el nombre al usuario si el expediente lo trae.** Solo si no hay expediente, o
 la razón social viene vacía, pregúntale cómo se llama la entidad.
 
-### Paso 2 — El CIF: de Gesia si lo tiene; si no, se busca y se confirma
+### Paso 2 — El CIF: se busca en internet por el nombre y lo confirma el usuario
 
-**Primero, el expediente.** El CIF no está en el contrato de datos documentado de
-`DatosAuditoria`; la columna que existe es `NIF`:
+**El CIF no está en Gesia: no lo busques en el expediente.** `DatosAuditoria` tiene una
+columna `NIF`, pero Gesia la usa desde hace varias versiones para el **sector** del cliente
+—en pantalla se llama así; por dentro conserva el nombre—, así que lo que trae no es un CIF.
+Lo que sale del expediente es solo el nombre (paso 1).
 
-```sql
-SELECT NIF FROM DatosAuditoria
-```
-
-Medido el 05/10/2026 en 19 expedientes: la columna existe en todos **y está vacía en
-todos**. Así que lo normal es seguir al punto siguiente. Si trae valor, se valida
-(abajo) y se usa, con origen «expediente de Gesia».
-
-**Si Gesia no lo tiene, búscalo en internet, solo con el nombre.** Es la regla 1:
+**Búscalo en internet, solo con el nombre.** Es la regla 1:
 hacia fuera viaja la denominación y nada más. Busca la razón social en BORME y en
 las fichas públicas de empresa (Infocif, Empresite, eInforma, LibreBORME), y apunta
 cada **candidata**: denominación tal como aparece, CIF, provincia o domicilio, y la
@@ -165,6 +177,7 @@ interrumpe otra vez al final.
 
 ### Paso 4 — Lanzar los tres agentes en paralelo
 
+<!-- solo-cowork:agentes -->
 Los tres subagentes del plugin, **en una sola tanda** (una llamada por agente,
 las tres en el mismo mensaje para que corran a la vez):
 
@@ -176,6 +189,7 @@ las tres en el mismo mensaje para que corran a la vez):
 
 (Instalados desde el plugin aparecen con su prefijo, p. ej.
 `gesia-auditoria:investigador-societario`.)
+<!-- /solo-cowork -->
 
 El prompt de cada uno lleva exactamente esto, y nada más del expediente:
 
@@ -188,36 +202,27 @@ Ventana temporal: desde <cierre − 5 años> hasta <hoy>
 Fecha de consulta a registrar: <hoy>
 ```
 
+<!-- solo-cowork:agentes-salida -->
 Cada agente devuelve **solo un JSON** (su contrato está en su propio fichero de
 `agents/`), que empieza por su `recuento`: cuántas fuentes consultadas y cuántos
 hechos lleva. Si uno devuelve otra cosa o falla, **un reintento y se sigue**: su
 sección del informe queda en ○ con la limitación explícita. No se bloquea la
 investigación entera por una pata.
+<!-- /solo-cowork -->
 
-### Paso 5 — Copiar los JSON al directorio de trabajo y comprobarlos
+### Paso 5 — Los JSON, en el directorio de trabajo, y comprobados
 
-Un directorio de trabajo **nuevo en cada ejecución**, en la carpeta temporal del sistema y
-**nunca en `AsistenteIA`**:
-
-```bash
-TRABAJO="$(mktemp -d "${TMPDIR:-/tmp}/investigacion-XXXX")" && echo "$TRABAJO"
-```
-
-**Anota la ruta que imprime**; si el entorno no conserva variables entre llamadas, vuelve a
-escribir `SKILL="…"` y `TRABAJO="<esa ruta>"` al principio de cada orden, sin crear otro
-directorio. No la guardes en un fichero para leerla luego con `$(cat …)`: al final se borra
-con la ruta escrita tal cual (paso 8). **No hagas `cd` a él**; trabaja con rutas completas:
-al final se borra desde fuera, y el entorno no deja borrar el directorio en el que estás.
-
+<!-- solo-cowork:agentes-copia -->
 Copia el JSON de cada agente, **entero y tal cual llegó en su mensaje**, sin retocar ni
 resumir, a `$TRABAJO/societario.json`, `$TRABAJO/sector-publico.json` y
 `$TRABAJO/riesgos-legales.json` —con la herramienta de escribir ficheros si el entorno la
 tiene, o con un heredoc entre comillas simples, que no toca el texto:
 `cat > "$TRABAJO/societario.json" <<'FIN_JSON'` … `FIN_JSON`—. Son la entrada del
 informe, **no se archivan** (regla 5): no van a `AsistenteIA`.
+<!-- /solo-cowork -->
 
-Y **comprueba las copias antes de seguir**, que es barato y caza lo que se pierde al
-copiar a mano:
+Y **comprueba los JSON antes de seguir**, que es barato y caza lo que se pierde por el
+camino:
 
 ```bash
 python "$SKILL/scripts/generar_informe.py" --comprobar \
@@ -227,8 +232,8 @@ python "$SKILL/scripts/generar_informe.py" --comprobar \
 ```
 
 Carga cada JSON y cuenta sus fuentes y sus hechos contra el `recuento` que declaró el
-agente. Salida `2` → una copia no carga o no cuadra: **vuelve a copiar ese JSON del mensaje
-del agente**, entero, y repite la comprobación. Si un agente no declaró recuento, lo dice y
+agente. Salida `2` → un JSON no carga o no cuadra: <!-- solo-cowork:alt=**vuelve a lanzar ese subagente**, con las mismas instrucciones, -->**vuelve a copiar ese JSON del mensaje
+del agente**, entero,<!-- /solo-cowork --> y repite la comprobación. Si un agente no declaró recuento, lo dice y
 no para: compáralo tú con su mensaje, y el informe hará constar que esa respuesta no se
 pudo cotejar. Si un agente se degradó, omite su `--evidencia-*`.
 
@@ -433,7 +438,7 @@ no solo dentro del informe.
 
 **Los temporales.** Borra el directorio de trabajo —con los tres JSON de los agentes y
 `informe.json`— **desde fuera**, sin haber hecho `cd` a él (si lo hiciste, sal antes), y
-**con la ruta literal que anotaste al crearlo** en el paso 5, escrita entera:
+**con la ruta literal que anotaste al crearlo**, al empezar, escrita entera:
 
 ```bash
 rm -rf "<la ruta que anotaste>"
@@ -470,13 +475,13 @@ nada con `exportar_consulta`, así que no hay volcados del MCP que limpiar.
 |---|---|
 | Servidor API de Gesia caído o sin expediente | se pregunta el nombre al usuario y se sigue igual |
 | El MCP avisa de otra conversación con otro expediente o perfil en el mismo servidor | se le dice al auditor tal cual y **no se sigue hasta que confirme** |
-| `NIF` vacío en `DatosAuditoria` (lo normal) | se busca el CIF en internet por el nombre y el usuario confirma la candidata |
+| El expediente no trae el CIF (siempre: la columna `NIF` es el sector) | se busca el CIF en internet por el nombre y el usuario confirma la candidata |
 | Varias candidatas con nombres parecidos | se enseñan todas y elige el usuario |
 | Ninguna candidata, o el usuario no reconoce ninguna | se le pide el CIF; si no lo tiene, **para** |
 | CIF con control inválido | se descarta esa candidata; si era el indicado por el usuario, **para** |
 | DNI/NIE en vez de CIF | **para.** Fuera del alcance |
 | Un agente falla o devuelve JSON inválido | un reintento; después, sección en ○ con limitación explícita |
-| La copia de un JSON no carga o no cuadra con su `recuento` (`--comprobar`, salida 2) | se vuelve a copiar del mensaje del agente, entero, y se repite la comprobación |
+| Un JSON no carga o no cuadra con su `recuento` (`--comprobar`, salida 2) | <!-- solo-cowork:alt=se vuelve a lanzar ese subagente -->se vuelve a copiar del mensaje del agente, entero,<!-- /solo-cowork --> y se repite la comprobación |
 | Un agente no declara `recuento` | se sigue; el informe dice con ATENCIÓN que esa respuesta no se pudo cotejar |
 | Una búsqueda web general trae la URL de una página | la sección 8 la presenta sin URL y lo dice con ATENCIÓN |
 | La búsqueda de la referencia no da una sola fila | segunda búsqueda más amplia y se pregunta enseñando las candidatas; nunca un código que no salga de `Referencias` de este expediente |
