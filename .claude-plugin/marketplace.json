@@ -9,7 +9,7 @@
     {
       "name": "gesia-auditoria",
       "source": "./plugins/gesia-auditoria",
-      "description": "Procedimientos de auditoría sobre el expediente de Gesia: estados financieros, memoria, saldos, riesgos, investigación de la entidad y pruebas de muestreo de ForSampling. Dejan papeles en el expediente; concluye el auditor. Los terceros viajan seudonimizados y las facturas se tachan en tu equipo antes de subirlas. Si solo tienes ForSampling, instala el de ForSampling. Requiere Windows.",
+      "description": "Procedimientos de auditoría sobre el expediente de Gesia: estados financieros, memoria, saldos, riesgos, investigación de la entidad, cuadro de mando y pruebas de muestreo de ForSampling. Dejan papeles en el expediente; concluye el auditor. Los terceros viajan seudonimizados y las facturas se tachan en tu equipo antes de subirlas. Si solo tienes ForSampling, instala el de ForSampling. Requiere Windows.",
       "author": {
         "name": "Ensys Consultores Informáticos, S.L."
       },

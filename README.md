@@ -112,6 +112,7 @@ La columna de la derecha dice qué lleva el plugin de ForSampling; el de Gesia l
 | **Continuidad de saldos de apertura** | Compara cuenta por cuenta la apertura del diario con el cierre auditado del ejercicio anterior (NIA-ES 510) | Papel de trabajo en Excel | — |
 | **Identificación de riesgos** | Elige los riesgos del encargo del catálogo de tu máster, a partir del balance, la cuenta de resultados y los ratios de los cinco ejercicios (NIA-ES 315) | Informe en Word | — |
 | **Investigación de la entidad** | Investiga al cliente en fuentes públicas de internet —BORME, contratación pública, subvenciones, jurisprudencia y prensa— con tres agentes en paralelo, citando cada hecho a su fuente y declarando lo que no consta | Papel de trabajo en Word | — |
+| **Cuadro de mando** | Una página con el estado del encargo por áreas, la importancia relativa, los riesgos identificados, la cédula principal de cada área con cinco ejercicios —marcando las variaciones que superan la IR del área— y los ratios con su evolución. Se abre en el navegador, sin internet | Página HTML | — |
 | **Registro de ejecución** | Escribe en el chat, de forma anónima, cómo ha ido un procedimiento: con qué tropezó y qué convendría mejorar. Sirve para reportarnos incidencias sin tener que explicarlas | Texto en el chat | Sí |
 
 Los entregables se escriben en `AsistenteIA\<carpeta del procedimiento>`
@@ -160,7 +161,7 @@ que acabe.
 
 ## Versión publicada
 
-**2.1.2**, con el programa que lee el expediente en la **1.26.3**.
+**2.1.3**, con el programa que lee el expediente en la **1.26.4**.
 
 Lo que conviene saber para usarlo con criterio, porque es lo que no se puede deducir mirando
 el resultado:
