@@ -161,7 +161,7 @@ que acabe.
 
 ## Versión publicada
 
-**2.1.4**, con el programa que lee el expediente en la **1.27.1**.
+**2.1.5**, con el programa que lee el expediente en la **1.28.2**.
 
 Lo que conviene saber para usarlo con criterio, porque es lo que no se puede deducir mirando
 el resultado:
